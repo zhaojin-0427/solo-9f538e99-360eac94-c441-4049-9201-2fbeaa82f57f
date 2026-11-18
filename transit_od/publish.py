@@ -8,6 +8,7 @@
   页面将其标记为"已过期"。
 """
 from .db import get_day_version, get_esv, now_iso
+from .estimate import invalidate_estimations_for_days
 from .ingest import day_of, datetime_from_us
 from .pairing import build_results
 
@@ -60,6 +61,8 @@ def publish_day(conn, day):
                 " VALUES(?,?,?,?,?,?,?)",
                 (pub_id, ev["card_id"], ev["event_id"], ev["ts_utc"], ev["station"], ev["direction"], reason),
             )
+        # 新发布取代旧发布：基于旧发布的区段测算同一事务内失效
+        invalidate_estimations_for_days(conn, {day})
         conn.execute("COMMIT")
         return pub_id
     except Exception:

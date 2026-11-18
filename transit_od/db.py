@@ -1,11 +1,13 @@
 """SQLite 存储层：连接、建表、公共助手。
 
 设计要点：
-- 所有写操作（批次提交、日发布）都在显式 BEGIN IMMEDIATE ... COMMIT 事务内完成，
+- 所有写操作（批次提交、日发布、区段测算）都在显式 BEGIN IMMEDIATE ... COMMIT 事务内完成，
   失败即 ROLLBACK，保证不会出现"半份结果"。
 - meta.event_set_version：每提交一个"有实际变更"的批次 +1，标识已提交事件集版本。
 - day_versions：每个 UTC 日的数据版本，批次提交时按受影响日期 +1，
   用于判断某日发布是否已过期。
+- estimations/estimation_edges：区段承载量测算结果；来源发布失效（补传推进
+  day_versions 或重新发布取代）时，在同一事务内将测算标为 invalid。
 """
 import os
 import sqlite3
@@ -94,6 +96,36 @@ CREATE TABLE IF NOT EXISTS publication_anomalies (
   reason    TEXT NOT NULL            -- dangling_entry | orphan_exit
 );
 CREATE INDEX IF NOT EXISTS idx_panom_pub ON publication_anomalies(pub_id);
+
+-- 区段承载量测算：每次测算一条记录；来源发布失效时 status 置为 invalid
+CREATE TABLE IF NOT EXISTS estimations (
+  est_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at      TEXT NOT NULL,
+  day             TEXT NOT NULL,      -- 测算针对的 UTC 日
+  pub_id          INTEGER,            -- 来源发布号；失败测算为 NULL
+  filename        TEXT,               -- 站网 CSV 文件名
+  status          TEXT NOT NULL CHECK (status IN ('current','invalid','failed')),
+  trips_total     INTEGER NOT NULL DEFAULT 0,
+  assigned        INTEGER NOT NULL DEFAULT 0,  -- 计入边负载的行程数
+  same_station    INTEGER NOT NULL DEFAULT 0,  -- 同站行程（不计入边负载）
+  missing_station INTEGER NOT NULL DEFAULT 0,  -- 站点不在站网中的行程
+  unreachable     INTEGER NOT NULL DEFAULT 0,  -- 站网内不可达的行程
+  station_count   INTEGER NOT NULL DEFAULT 0,
+  edge_count      INTEGER NOT NULL DEFAULT 0,
+  error           TEXT
+);
+
+-- 测算结果：每条站网边一行，人次以精确分数（分子/分母）保存
+CREATE TABLE IF NOT EXISTS estimation_edges (
+  est_id    INTEGER NOT NULL,
+  seq       INTEGER NOT NULL,         -- 边在站网 CSV 中的顺序
+  station_a TEXT NOT NULL,
+  station_b TEXT NOT NULL,
+  minutes   INTEGER NOT NULL,
+  load_num  TEXT NOT NULL,            -- 人次分子（可超 64 位，按文本存）
+  load_den  TEXT NOT NULL             -- 人次分母
+);
+CREATE INDEX IF NOT EXISTS idx_est_edges_est ON estimation_edges(est_id);
 """
 
 

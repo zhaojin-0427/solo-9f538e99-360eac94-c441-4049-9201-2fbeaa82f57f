@@ -12,6 +12,7 @@
   <form method="post" action="{{ url_for('main.publish', day=day) }}">
     <button type="submit">重新发布（基于当前已提交事件集）</button>
   </form>
+  <p><a href="{{ url_for('main.estimate', day=day) }}">对该日最新有效发布做区段测算 →</a></p>
   <h3>行程（{{ latest['trip_count'] }}）— 来自发布 #{{ latest['pub_id'] }}</h3>
   {{ p.trip_table(trips) }}
   <h3>异常（{{ latest['anomaly_count'] }}）</h3>

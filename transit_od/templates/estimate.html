@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}区段承载量测算{% endblock %}
+{% block content %}
+<div class="card">
+<h2>区段承载量测算</h2>
+<p class="muted">选择 UTC 日期（系统自动取该日最新且未过期的发布作为来源），上传站网 CSV，
+将该发布中每条异站行程沿所有等时最短路线平均分摊 1 人次，累加得到各边人次。</p>
+<form method="post" enctype="multipart/form-data">
+  <p>
+    <label>UTC 日期：
+      <select name="day" required>
+        <option value="">— 请选择 —</option>
+        {% for o in day_opts %}
+        <option value="{{ o.day }}" {% if o.day == selected_day %}selected{% endif %}>
+          {{ o.day }}（最新发布 #{{ o.pub['pub_id'] }} · {{ o.state }}）
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <input type="file" name="file" accept=".csv" required>
+    <button type="submit">开始测算</button>
+  </p>
+</form>
+<ul class="muted">
+  <li>站网 CSV 必需列（表头不区分大小写）：<code>station_a,station_b,minutes</code>（站名列亦可用 <code>from,to</code>）。</li>
+  <li>无向边，分钟数为正整数；最多 80 站、160 边；自环或重复边（含反向重复）整份拒绝。</li>
+  <li>同站、站点不在站网中、站网内不可达的行程分别计数，不计入边负载。</li>
+  <li>等时最短路线再多也完整精确分摊（按路径条数精确到分数），不只取部分路径。</li>
+  <li>测算保存来源发布号；补传或重发使来源发布失效后，对应测算标记为「已失效」。</li>
+</ul>
+</div>
+<div class="card">
+<h3>测算记录</h3>
+<table>
+<tr><th>测算号</th><th>时间(UTC)</th><th>UTC 日期</th><th>来源发布</th><th>站/边</th><th>总行程</th><th>计入边负载</th><th>同站</th><th>站点缺失</th><th>不可达</th><th>状态</th><th></th></tr>
+{% for r in ests %}
+<tr>
+  <td>#{{ r.e['est_id'] }}</td>
+  <td>{{ r.e['created_at'] }}</td>
+  <td>{{ r.e['day'] }}</td>
+  <td>{% if r.e['pub_id'] is not none %}#{{ r.e['pub_id'] }}{% else %}—{% endif %}</td>
+  <td>{{ r.e['station_count'] }}/{{ r.e['edge_count'] }}</td>
+  <td>{{ r.e['trips_total'] }}</td>
+  <td>{{ r.e['assigned'] }}</td>
+  <td>{{ r.e['same_station'] }}</td>
+  <td>{{ r.e['missing_station'] }}</td>
+  <td>{{ r.e['unreachable'] }}</td>
+  <td>
+    {% if r.state == '当前有效' %}<span class="badge b-ok">当前有效</span>
+    {% elif r.state == '已失效' %}<span class="badge b-stale">已失效</span>
+    {% else %}<span class="badge b-none">失败</span>{% endif %}
+  </td>
+  <td><a href="{{ url_for('main.estimate_detail', est_id=r.e['est_id']) }}">查看</a></td>
+</tr>
+{% else %}
+<tr><td colspan="12" class="muted">暂无测算记录。</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

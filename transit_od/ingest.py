@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from .db import get_esv, now_iso
+from .estimate import invalidate_estimations_for_days
 
 REQUIRED_COLS = ["card_id", "event_id", "revision", "ts_utc", "station", "direction"]
 
@@ -278,6 +279,8 @@ def commit_batch(conn, filename, text):
                     (d,),
                 )
                 conn.execute("INSERT INTO batch_affected_days(batch_id, day) VALUES(?,?)", (batch_id, d))
+            # 受影响日的发布随之过期，基于它们的区段测算同一事务内失效
+            invalidate_estimations_for_days(conn, affected_days)
 
         conn.execute("COMMIT")
         return batch_id, True, None

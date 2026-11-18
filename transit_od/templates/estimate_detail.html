@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}测算 #{{ est['est_id'] }}{% endblock %}
+{% block content %}
+<div class="card">
+<h2>区段测算 #{{ est['est_id'] }}
+  {% if state == '当前有效' %}<span class="badge b-ok">当前有效</span>
+  {% elif state == '已失效' %}<span class="badge b-stale">已失效</span>
+  {% else %}<span class="badge b-none">失败</span>{% endif %}
+</h2>
+{% if state == '已失效' %}
+<div class="warn">该测算的来源发布已失效（补传/更正推进了数据版本，或已被重新发布取代）。结果保留可读，请基于当前有效发布重新测算。</div>
+{% endif %}
+{% if est['status'] == 'failed' %}
+<div class="flash-err">测算失败：{{ est['error'] }}</div>
+{% else %}
+<table>
+<tr><th>测算时间(UTC)</th><td>{{ est['created_at'] }}</td></tr>
+<tr><th>UTC 日期</th><td><a href="{{ url_for('main.day_detail', day=est['day']) }}">{{ est['day'] }}</a></td></tr>
+<tr><th>来源发布号</th><td>{% if pub %}<a href="{{ url_for('main.publication', pub_id=pub['pub_id']) }}">发布 #{{ pub['pub_id'] }}</a>{% else %}—{% endif %}</td></tr>
+<tr><th>站网文件</th><td>{{ est['filename'] or '—' }}（{{ est['station_count'] }} 站 / {{ est['edge_count'] }} 边）</td></tr>
+<tr><th>发布行程总数</th><td>{{ est['trips_total'] }}</td></tr>
+<tr><th>计入边负载</th><td>{{ est['assigned'] }} 人次（异站且可达）</td></tr>
+<tr><th>未分配</th><td>同站 {{ est['same_station'] }} · 站点缺失 {{ est['missing_station'] }} · 不可达 {{ est['unreachable'] }}（不计入边负载）</td></tr>
+</table>
+{% endif %}
+</div>
+{% if est['status'] != 'failed' %}
+<div class="card">
+<h3>各边人次（按负载降序）</h3>
+<table>
+<tr><th>站 A</th><th>站 B</th><th>分钟</th><th>人次（精确分数 ≈ 小数）</th></tr>
+{% for e in edges %}
+<tr>
+  <td>{{ e.station_a }}</td><td>{{ e.station_b }}</td><td>{{ e.minutes }}</td><td>{{ e.load_text }}</td>
+</tr>
+{% else %}
+<tr><td colspan="4" class="muted">无边</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endif %}
+{% endblock %}
